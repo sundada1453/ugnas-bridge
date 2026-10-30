@@ -49,8 +49,14 @@ class PanelInternal:
         return d.get("list") or d.get("result") or (d if isinstance(d, list) else [])
 
     def list_cards(self) -> Optional[List[dict]]:
-        """枚举全部卡片；逐组容错，全部失败返回 None（调用方回退本地）。"""
+        """枚举全部卡片；未配管理员则尝试公开，失败返回 None（调用方回退本地）。"""
         self.errors = []
+        if self.user:
+            try:
+                self.login()
+            except Exception as e:  # noqa: BLE001
+                self.errors.append(f"login: {e}")
+                return None
         try:
             groups = self.list_groups()
         except Exception as e:  # noqa: BLE001
