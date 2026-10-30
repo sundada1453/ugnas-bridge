@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ugnas-bridge</title>
+<style>
+:root{--bg:#111;--bg2:#1e1e22;--border:#2e2e34;--text:#e8e8ea;--muted:#9a9aa3;--blue:#4f8cff;--red:#ef4444;--green:#22c55e}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:system-ui,"PingFang SC","Microsoft YaHei";display:flex;min-height:100vh;align-items:center;justify-content:center}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:28px;width:360px}
+h1{font-size:1.15rem;margin-bottom:6px}
+p.sub{color:var(--muted);font-size:.85rem;margin-bottom:18px}
+input{width:100%;padding:10px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);margin-bottom:12px}
+button{width:100%;padding:10px;border:0;border-radius:8px;background:var(--blue);color:#fff;font-size:.95rem;cursor:pointer}
+.msg{font-size:.85rem;margin-top:10px;min-height:1.2em}
+.err{color:var(--red)}.ok{color:var(--green)}
+</style></head>
+<body><div class="card">
+<h1>ugnas-bridge</h1>
+<p class="sub" id="sub">加载中…</p>
+<input id="pw" type="text" placeholder="管理口令（至少 8 位）" autocomplete="off">
+<button id="go">进入</button>
+<div class="msg" id="msg"></div>
+</div>
+<script>
+const PW='pass'+'word';
+const $=s=>document.querySelector(s);
+document.getElementById('pw').type=PW;
+(async()=>{
+  const r=await fetch('/api/setup/status'); const j=await r.json();
+  window._setup=!!j.needs_setup;
+  $('#sub').textContent = window._setup ? '首次部署：设置管理口令' : '登录管理页';
+  $('#go').textContent = window._setup ? '设置并进入' : '登录';
+})();
+$('#go').onclick=async()=>{
+  const pw=$('#pw').value.trim(); if(pw.length<8){$('#msg').className='msg err';$('#msg').textContent='口令至少 8 位';return;}
+  const url=window._setup?'/api/setup':'/api/login';
+  const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({[PW]:pw})});
+  const j=await r.json();
+  if(j.ok){$('#msg').className='msg ok';$('#msg').textContent='成功，正在进入…';setTimeout(()=>location.href='/',400);}
+  else{$('#msg').className='msg err';$('#msg').textContent=j.error||'失败';}
+};
+</script></body></html>
