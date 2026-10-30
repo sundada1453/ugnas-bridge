@@ -1,0 +1,10 @@
+.git
+.venv
+ugos-cli
+poc/web/node_modules
+__pycache__
+*.pyc
+logs
+state
+prototype
+docs

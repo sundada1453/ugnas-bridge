@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+ugos-cli/
+poc/web/node_modules/
+state/*.db
+state/*.db-journal
+logs/
+prototype/
+.DS_Store
