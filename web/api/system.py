@@ -27,6 +27,18 @@ def health():
             "configured": {"ugreen": _cfg("ugreen"), "sunpanel": _cfg("sunpanel")}}
 
 
+@router.get("/health/detail")
+def health_detail():
+    from service.health_service import HealthService
+    return HealthService().summary()
+
+
+@router.post("/health/run")
+def health_run():
+    from service.health_service import HealthService
+    return HealthService().run_once()
+
+
 @router.post("/test/ugreen")
 async def test_ugreen(request: Request):
     from web.api.config import get_cfg

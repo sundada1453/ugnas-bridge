@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""ugnas-bridge v2 · FastAPI 应用入口（F1-1：路由分层 + 管理认证）"""
+"""ugnas-bridge v2 · FastAPI 应用入口"""
 from __future__ import annotations
 
 import os
@@ -14,11 +14,29 @@ ROOT = os.path.dirname(HERE)
 sys.path.insert(0, ROOT)
 
 from store.db import init_db                      # noqa: E402
+from core.logging import setup_logging            # noqa: E402
+from core.scheduler import PeriodicRunner         # noqa: E402
+from service.health_service import HealthService  # noqa: E402
 from web import security                          # noqa: E402
 from web.api import auth, config, discover, open as openapi, sync, system  # noqa: E402
 
 app = FastAPI(title="ugnas-bridge", version="2.0.0-dev")
 init_db()
+LOG = setup_logging()
+_health = HealthService()
+_sched = PeriodicRunner(_health.run_once, interval=int(os.environ.get("UGNAS_HEALTH_INTERVAL", "300")), name="health")
+
+
+@app.on_event("startup")
+def _startup():
+    _sched.start()
+    LOG.info("ugnas-bridge started; health interval=%ss", os.environ.get("UGNAS_HEALTH_INTERVAL", "300"))
+
+
+@app.on_event("shutdown")
+def _shutdown():
+    _sched.stop()
+
 
 PUBLIC_API = {
     "/api/health",
