@@ -2,9 +2,10 @@
 # -*- coding: utf-8 -*-
 """同步执行服务（F3-4）
 
+与 v1 state 语义对齐：快照 JSON = {"ts","service_base","changed":{onlyName:{new_url,old_url}}}
 - plan(): 只对「勾选」的 diff 行生成操作；expired 按 dispose ∈ {skip,trash,delete}
-- apply(): 执行前落 state 快照（可整批回滚），逐条执行并记录 sync_runs
-- rollback(): 从快照恢复卡片
+- apply(): 先落快照再执行，逐条记录 sync_runs
+- rollback(): 按快照 changed[only_name].old_url 还原
 """
 from __future__ import annotations
 
@@ -28,13 +29,17 @@ class Op:
     port: int
     state: str
     action: str
-    payload: Dict[str, str] = field(default_factory=dict)
+    title: str = ""
+    icon: str = ""
+    group_id: Optional[int] = None
+    new_url: str = ""
 
 
 @dataclass
 class Plan:
     ops: List[Op]
     selected: List[str]
+    service_base: str = ""
 
     def counts(self) -> Dict[str, int]:
         out: Dict[str, int] = {}
@@ -51,10 +56,22 @@ class Plan:
         return len(self.executable())
 
 
+def _iso() -> str:
+    return time.strftime("%Y-%m-%dT%H:%M:%S%z")
+
+
 class SyncService:
-    def __init__(self, client, group_trash: str = "回收站"):
+    def __init__(self, client, bridge_base: str = "", key: str = "", group_trash: str = "回收站"):
         self.client = client
+        self.bridge_base = bridge_base.rstrip("/")
+        self.key = key
         self.group_trash = group_trash
+
+    def open_url(self, port: int) -> str:
+        if not self.bridge_base:
+            return ""
+        q = f"?k={self.key}" if self.key else ""
+        return f"{self.bridge_base}/open/{port}{q}"
 
     def plan(self, diff_rows, selected, dispose: Optional[Dict[str, str]] = None,
              default_dispose: str = "skip") -> Plan:
@@ -65,45 +82,53 @@ class SyncService:
             st = r["state"] if isinstance(r, dict) else r.state
             on = r["only_name"] if isinstance(r, dict) else r.only_name
             port = r["port"] if isinstance(r, dict) else r.port
-            payload = (r.get("new") if isinstance(r, dict) else r.new) or {}
+            newp = (r.get("new") if isinstance(r, dict) else r.new) or {}
             if on not in sel or st == "same":
                 continue
             act = ACTION_BY_STATE.get(st, "skip")
             if st == "expired":
                 act = dispose.get(on, default_dispose)
-            ops.append(Op(on, port, st, act, payload))
-        return Plan(ops, sorted(sel))
+            gid = newp.get("itemGroupID") or newp.get("item_group_id")
+            ops.append(Op(on, port, st, act,
+                          title=newp.get("title", ""), icon=newp.get("icon", ""),
+                          group_id=int(gid) if gid else None,
+                          new_url=self.open_url(port)))
+        return Plan(ops, sorted(sel), self.bridge_base)
 
-    def _snapshot(self, cards: List[dict]) -> str:
+    def _snapshot(self, changes: Dict[str, dict]) -> str:
         os.makedirs(SNAP_DIR, exist_ok=True)
-        p = os.path.join(SNAP_DIR, f"cards_{time.strftime('%Y%m%d_%H%M%S')}.json")
+        p = os.path.join(SNAP_DIR, f"cards_state_{time.strftime('%Y%m%d_%H%M%S')}.json")
+        data = {"ts": _iso(), "service_base": self.bridge_base, "changed": changes}
         with open(p, "w", encoding="utf-8") as f:
-            json.dump({"ts": int(time.time()), "cards": cards}, f, ensure_ascii=False, indent=2)
+            json.dump(data, f, ensure_ascii=False, indent=2)
         return p
 
-    def apply(self, plan: Plan, snapshot_cards: List[dict]) -> dict:
-        snap = self._snapshot(snapshot_cards)
+    def apply(self, plan: Plan, cards: Dict[str, dict]) -> dict:
+        changes: Dict[str, dict] = {}
+        for op in plan.executable():
+            old = (cards.get(op.only_name) or {}).get("url", "")
+            changes[op.only_name] = {"new_url": op.new_url, "old_url": old}
+        snap = self._snapshot(changes)
         ok = fail = 0
         results = []
         for op in plan.executable():
             try:
                 if op.action == "create":
-                    self.client.add_item(onlyName=op.only_name, title=op.payload.get("title", ""),
-                                         icon=op.payload.get("icon", ""))
+                    self.client.create_item(op.only_name, op.title, op.new_url, icon_url=op.icon,
+                                            item_group_id=op.group_id)
                 elif op.action == "update":
-                    card = self.client.get_card(op.only_name) or {}
-                    if card.get("id"):
-                        self.client.update_item(card["id"], title=op.payload.get("title"),
-                                                icon=op.payload.get("icon"))
+                    self.client.update_item(op.only_name, title=op.title or None,
+                                            iconUrl=op.icon or None, url=op.new_url or None,
+                                            itemGroupID=op.group_id)
                 elif op.action == "trash":
-                    card = self.client.get_card(op.only_name) or {}
-                    if card.get("id"):
-                        g = self.client.create_group(self.group_trash)
-                        self.client.update_item(card["id"], itemGroupID=g.get("id"))
+                    g = self.client.create_group(self.group_trash)
+                    gid = g.get("itemGroupID") or g.get("id")
+                    self.client.update_item(op.only_name, itemGroupID=gid)
                 elif op.action == "delete":
-                    card = self.client.get_card(op.only_name) or {}
-                    if card.get("id") and hasattr(self.client, "delete_item"):
-                        self.client.delete_item(card["id"])
+                    fn = getattr(self.client, "delete_item", None)
+                    if not fn:
+                        raise RuntimeError("delete unavailable: OpenAPI has no item delete (use panel admin API)")
+                    fn(op.only_name)
                 ok += 1
                 results.append({"only_name": op.only_name, "action": op.action, "ok": True})
             except Exception as e:  # noqa: BLE001
@@ -125,12 +150,9 @@ class SyncService:
     def rollback(self, snapshot_path: str) -> dict:
         data = json.load(open(snapshot_path, encoding="utf-8"))
         ok = fail = 0
-        for c in data.get("cards", []):
+        for on, rec in (data.get("changed") or {}).items():
             try:
-                if c.get("id"):
-                    self.client.update_item(c["id"], title=c.get("title"), icon=c.get("icon"),
-                                            itemGroupID=c.get("group_id") or c.get("itemGroupID"),
-                                            url=c.get("url"))
+                self.client.update_item(on, url=rec.get("old_url"))
                 ok += 1
             except Exception:
                 fail += 1

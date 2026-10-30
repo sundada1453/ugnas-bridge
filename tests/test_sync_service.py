@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""F2-1 + F3-4 服务层单元测试（假客户端，不走网络）。"""
+"""F3-4 同步服务单测（假客户端，不走网络）。"""
+import json
 import os
 import sys
 
@@ -15,53 +16,55 @@ init_db()
 class FakeClient:
     def __init__(self):
         self.calls = []
-        self.cards = {"ugnas-7050": {"id": "c7050", "title": "alist-old"}}
 
-    def get_card(self, on):
-        return self.cards.get(on)
+    def create_item(self, on, title, url, icon_url="", item_group_id=None):
+        self.calls.append(("create", on, url)); return {"id": 1}
 
-    def add_item(self, **kw):
-        self.calls.append(("add", kw.get("onlyName"))); return {"id": "new"}
+    def update_item(self, on, **kw):
+        self.calls.append(("update", on, kw)); return True
 
-    def update_item(self, iid, **kw):
-        self.calls.append(("update", iid, kw)); return True
+    def create_group(self, title):
+        self.calls.append(("group", title)); return {"itemGroupID": 999}
 
-    def create_group(self, name):
-        self.calls.append(("group", name)); return {"id": "gtrash"}
-
-    def delete_item(self, iid):
-        self.calls.append(("delete", iid)); return True
+    def delete_item(self, on):
+        self.calls.append(("delete", on)); return True
 
 
-def test_plan_and_apply():
+def test_plan_and_apply_v1_snapshot():
     rows = [
-        {"state": "new", "only_name": "ugnas-8080", "port": 8080, "new": {"title": "sub2api", "icon": ""}},
-        {"state": "update", "only_name": "ugnas-7050", "port": 7050, "new": {"title": "alist", "icon": "alist"}},
+        {"state": "new", "only_name": "ugnas-8080", "port": 8080, "new": {"title": "sub2api"}},
+        {"state": "update", "only_name": "ugnas-7050", "port": 7050, "new": {"title": "alist"}},
         {"state": "expired", "only_name": "ugnas-9208", "port": 9208},
         {"state": "expired", "only_name": "ugnas-9820", "port": 9820},
         {"state": "same", "only_name": "ugnas-5244", "port": 5244},
-        {"state": "new", "only_name": "ugnas-9999", "port": 9999, "new": {"title": "not-selected"}},
+        {"state": "new", "only_name": "ugnas-9999", "port": 9999, "new": {"title": "x"}},
     ]
-    svc = SyncService(FakeClient())
+    cli = FakeClient()
+    svc = SyncService(cli, bridge_base="http://1.94.204.44:8770", key="K")
     plan = svc.plan(rows, selected={"ugnas-8080", "ugnas-7050", "ugnas-9208", "ugnas-9820"},
                     dispose={"ugnas-9208": "trash", "ugnas-9820": "delete"})
-    assert plan.total_selected() == 4, plan.total_selected()
-    acts = {o.only_name: o.action for o in plan.executable()}
-    assert acts == {"ugnas-8080": "create", "ugnas-7050": "update",
-                    "ugnas-9208": "trash", "ugnas-9820": "delete"}, acts
-    res = svc.apply(plan, snapshot_cards=[{"id": "c7050", "title": "alist-old"}])
-    assert res["ok"] == 4 and res["fail"] == 0, res
-    assert os.path.exists(res["snapshot"])
-    print("test_plan_and_apply PASS", plan.counts())
+    assert plan.total_selected() == 4
+    res = svc.apply(plan, cards={"ugnas-7050": {"url": "https://old/7050"},
+                                 "ugnas-9208": {"url": "https://old/9208"},
+                                 "ugnas-9820": {"url": "https://old/9820"}})
+    assert res["ok"] == 4, res
+    snap = json.load(open(res["snapshot"], encoding="utf-8"))
+    assert set(snap.keys()) >= {"ts", "service_base", "changed"}
+    assert snap["changed"]["ugnas-7050"] == {"new_url": "http://1.94.204.44:8770/open/7050?k=K",
+                                             "old_url": "https://old/7050"}, snap["changed"]
+    rb = svc.rollback(res["snapshot"])
+    assert rb["ok"] == 4, rb
+    assert ("update", "ugnas-7050", {"url": "https://old/7050"}) in cli.calls
+    print("test_plan_and_apply_v1_snapshot PASS", plan.counts())
 
 
-def test_dispose_default_skip():
+def test_default_skip():
     svc = SyncService(FakeClient())
     plan = svc.plan([{"state": "expired", "only_name": "ugnas-1", "port": 1}], selected={"ugnas-1"})
-    assert plan.total_selected() == 0, "默认跳过不应执行"
-    print("test_dispose_default_skip PASS")
+    assert plan.total_selected() == 0
+    print("test_default_skip PASS")
 
 
 if __name__ == "__main__":
-    test_plan_and_apply()
-    test_dispose_default_skip()
+    test_plan_and_apply_v1_snapshot()
+    test_default_skip()
