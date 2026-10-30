@@ -1,0 +1,35 @@
+[Unit]
+Description=UGNAS Bridge - 绿联容器免登录直达服务
+Documentation=file:/opt/ugnas-bridge/docs/03-部署手册.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# ---- 参数化：全部可在 /etc/ugnas-bridge.env 覆盖 ----
+Environment=UGNAS_BRIDGE_HOST=0.0.0.0
+Environment=UGNAS_BRIDGE_PORT=8770
+Environment=UGNAS_BRIDGE_BASE=https://<ALIAS>.ug.link
+Environment=UGNAS_BRIDGE_ALIAS=<ALIAS>
+Environment=UGNAS_BRIDGE_USER=<USER>
+Environment=UGNAS_BRIDGE_REFRESH=1800
+Environment=UGNAS_BRIDGE_HEARTBEAT=300
+Environment=UGNAS_BRIDGE_LOG=/var/log/ugnas-bridge/bridge.log
+# UGNAS_BRIDGE_PASS / UGNAS_BRIDGE_KEY 由该文件注入（0600，不入仓库）
+EnvironmentFile=-/etc/ugnas-bridge.env
+
+ExecStart=/usr/bin/python3 /opt/ugnas-bridge/poc/ugnas_bridge.py
+WorkingDirectory=/opt/ugnas-bridge
+Restart=always
+RestartSec=5
+# 开机自启由 [Install] + systemctl enable 保证
+StandardOutput=append:/var/log/ugnas-bridge/stdout.log
+StandardError=append:/var/log/ugnas-bridge/stderr.log
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full
+ReadWritePaths=/var/log/ugnas-bridge
+
+[Install]
+WantedBy=multi-user.target
