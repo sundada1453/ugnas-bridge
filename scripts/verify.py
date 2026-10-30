@@ -1,12 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""v2 验收一键自检（规格书 §6），判定与真实状态机一致。
-
-状态机：
-1) needs_setup=true -> open SKIP
-2) 已初始化但 ugreen 未配置 -> open 期望 400/502
-3) 已初始化且 ugreen 已配置：带 --key -> 无?k= 401、带?k= 302；不带 --key -> 接受 401/302/502
-"""
+"""v2 验收一键自检（规格书 §6），判定与真实状态机一致，且不跟随重定向。"""
 import argparse
 import json
 import sys
@@ -14,10 +8,18 @@ import urllib.error
 import urllib.request
 
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+_OPENER = urllib.request.build_opener(_NoRedirect)
+
+
 def req(url, method="GET", timeout=8):
     r = urllib.request.Request(url, method=method)
     try:
-        with urllib.request.urlopen(r, timeout=timeout) as resp:
+        with _OPENER.open(r, timeout=timeout) as resp:
             return resp.status, resp.read()[:600]
     except urllib.error.HTTPError as e:
         return e.code, b""
