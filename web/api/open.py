@@ -18,7 +18,7 @@ router = APIRouter(tags=["open"])
 def open_port(port: int, request: Request):
     ug = get_cfg("ugreen")
     if not ug:
-        raise HTTPException(400, "ugreen not configured")
+        raise HTTPException(502, "ugreen not configured")
     key_expected = os.environ.get("UGNAS_BRIDGE_KEY", "")
     if key_expected and request.query_params.get("k") != key_expected:
         raise HTTPException(401, "invalid key")
