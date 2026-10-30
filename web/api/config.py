@@ -17,6 +17,7 @@ router = APIRouter(prefix="/api/config", tags=["config"])
 _FIELDS = {
     "ugreen": ("base", "user", "cred"),
     "sunpanel": ("base", "token"),
+    "sunpanel_admin": ("user", "cred"),
 }
 
 

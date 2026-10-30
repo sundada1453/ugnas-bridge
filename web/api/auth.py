@@ -55,5 +55,8 @@ def logout(request: Request):
 
 @router.get("/session")
 def session(request: Request):
+    import os
+    if os.environ.get("UGNAS_DEMO_AUTH") == "1":   # 本地截图/演示
+        return {"ok": True, "authed": True}
     tok = request.cookies.get(security.COOKIE, "")
     return {"ok": True, "authed": security.session_valid(tok)}
