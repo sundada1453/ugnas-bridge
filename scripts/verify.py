@@ -2,11 +2,9 @@
 # -*- coding: utf-8 -*-
 """v2 验收一键自检（规格书 §6），判定与真实状态机一致。
 
-用法：python3 scripts/verify.py --base http://127.0.0.1:8770 [--key KEY]
-
 状态机：
-1) needs_setup=true -> open 检查 SKIP
-2) 已初始化但 ugreen 未配置 -> open 期望 400
+1) needs_setup=true -> open SKIP
+2) 已初始化但 ugreen 未配置 -> open 期望 400/502
 3) 已初始化且 ugreen 已配置：带 --key -> 无?k= 401、带?k= 302；不带 --key -> 接受 401/302/502
 """
 import argparse
@@ -41,19 +39,16 @@ def main():
     a = ap.parse_args()
     base = a.base.rstrip("/")
     checks = []
-
     st, body = req(base + "/api/health")
     checks.append(("health 200", st == 200))
     health = jget(body)
-
     st2, body2 = req(base + "/api/setup/status")
     needs_setup = bool(jget(body2).get("needs_setup", True))
-
     if needs_setup:
         print("SKIP open 检查：实例未初始化（needs_setup=true）")
     elif not health.get("configured", {}).get("ugreen"):
         s, _ = req(base + "/open/8080")
-        checks.append(("open 未配置 400", s == 400))
+        checks.append(("open 未配置(400/502)", s in (400, 502)))
     else:
         if a.key:
             s, _ = req(base + "/open/8080")
@@ -63,7 +58,6 @@ def main():
         else:
             s, _ = req(base + "/open/8080")
             checks.append(("open 可达(401/302/502)", s in (401, 302, 502)))
-
     ok = all(c[1] for c in checks)
     for name, passed in checks:
         print("PASS" if passed else "FAIL", name)

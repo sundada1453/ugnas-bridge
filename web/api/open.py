@@ -22,10 +22,13 @@ def open_port(port: int, request: Request):
     key_expected = os.environ.get("UGNAS_BRIDGE_KEY", "")
     if key_expected and request.query_params.get("k") != key_expected:
         raise HTTPException(401, "invalid key")
-    c = UgosClient(ug["base"])
-    d = c.login(ug["user"], ug["cred"])
-    j = c.docker_token_v2(port, d["token"], d["token_id"], d["public_key"])
-    ru = ((j.get("data") or {}) if isinstance(j, dict) else {}).get("redirect_url")
+    try:
+        c = UgosClient(ug["base"])
+        d = c.login(ug["user"], ug["cred"])
+        j = c.docker_token_v2(port, d["token"], d["token_id"], d["public_key"])
+        ru = ((j.get("data") or {}) if isinstance(j, dict) else {}).get("redirect_url")
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(502, f"bridge upstream failed: {str(e)[:120]}")
     if not ru:
         raise HTTPException(502, "dockerToken failed")
     return RedirectResponse(ru, status_code=302)
