@@ -7,11 +7,13 @@
   preview 必须在响应里标注数据源，apply 则直接 409 拒绝，禁止用过期快照做写入判定（防重复建卡）。
 - P0-1：apply 构造 PanelInternal 传入 SyncService，删除走管理员内部接口。
 - 响应包络改用 success 字段，避免与计数 ok 冲突（旧实现 {"ok": True, **{"ok": 0}} 被覆盖成 0）。
+- v2.0.1：四态三层兜底（apps + 宿主 TCP probe + health）；v1 cards_state 保护；只管理 ugnas-<port> 卡。
 """
 from __future__ import annotations
 
 import json
 import os
+import re
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
@@ -42,6 +44,28 @@ def _load_apps():
     return apps, manual
 
 
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
+def _legacy_ports():
+    """v1 遗产保护：读取 state/cards_state.json（v1 快照）的 ugnas-<port> 卡。
+
+    用户明确要求不碰 v1 遗产 26 卡；这些卡即使当前发现集没有对应端口，也不得判过期。
+    仅对已存在的卡生效（diff 的 manual 池），不会创建新卡。
+    """
+    path = os.environ.get("UGNAS_LEGACY_STATE", os.path.join(ROOT, "state", "cards_state.json"))
+    try:
+        data = json.load(open(path, encoding="utf-8"))
+        out = set()
+        for name in (data.get("changed") or {}):
+            m = re.match(r"^ugnas-(\d+)$", str(name))
+            if m:
+                out.add(int(m.group(1)))
+        return out
+    except Exception:
+        return set()
+
+
 def _local_cards():
     c = connect()
     try:
@@ -50,6 +74,38 @@ def _local_cards():
         c.close()
     return [Card(r["only_name"], int(r["port"]), title=r["title"] or "", icon=r["icon"] or "",
                  group_id=r["group_id"] or "", url=r["url"] or "", lan_url=r["lan_url"] or "") for r in rows]
+
+
+def _live_ports():
+    """四态判定兜底：宿主 TCP 探测 + health 已确认 up 的端口。
+
+    layer1 容器发现端口由 _load_apps 负责；本函数提供 layer2/3。
+    返回 (ports, meta)；探测失败不影响已有 apps 结果。
+    """
+    ports = set()
+    meta = {}
+    try:
+        from discover.host_probe import host_listening_ports
+        hp = host_listening_ports()
+        meta["host_probe"] = {"ok": hp.get("ok", False), "count": len(hp.get("ports") or []),
+                              "container": hp.get("container", ""), "error": hp.get("error", "")}
+        if hp.get("ok"):
+            ports.update(int(p) for p in (hp.get("ports") or []))
+    except Exception as e:  # noqa: BLE001
+        meta["host_probe"] = {"ok": False, "count": 0, "error": str(e)[:160]}
+    try:
+        c = connect()
+        try:
+            rows = c.execute("SELECT port FROM health WHERE up=1").fetchall()
+        finally:
+            c.close()
+        health_ports = {int(r["port"]) for r in rows}
+        ports.update(health_ports)
+        meta["health_ports"] = len(health_ports)
+    except Exception as e:  # noqa: BLE001
+        meta["health_ports"] = 0
+        meta["health_error"] = str(e)[:160]
+    return ports, meta
 
 
 def _save_cards(cards):
@@ -91,10 +147,15 @@ def _load_cards(require_live: bool = False):
             raise RuntimeError("面板卡片枚举失败: " + "；".join(pi.errors or ["unknown"]))
         cards = []
         skipped_no_name = 0
+        skipped_unmanaged = 0
         for it in items:
             on = it.get("onlyName") or it.get("only_name")
             if not on:
                 skipped_no_name += 1
+                continue
+            # 只管理 bridge 自己的 ugnas-<port> 卡；用户原生卡/分组卡不参与四态与删除
+            if not re.match(r"^ugnas-\d+$", str(on)):
+                skipped_unmanaged += 1
                 continue
             port = 0
             try:
@@ -112,6 +173,7 @@ def _load_cards(require_live: bool = False):
         _save_cards(cards)
         return cards, {"source": "panel", "stale": False, "count": len(cards),
                        "skipped_no_name": skipped_no_name,
+                       "skipped_unmanaged": skipped_unmanaged,
                        "errors": pi.errors,
                        "admin_configured": bool(admin.get("user"))}
     except Exception as e:  # noqa: BLE001
@@ -131,9 +193,13 @@ def preview():
                             status_code=400)
     apps, manual = _load_apps()
     cards, meta = _load_cards(require_live=False)
-    rows = diff(apps, cards, manual_ports=manual)
+    live_ports, live_meta = _live_ports()
+    legacy_ports = _legacy_ports()
+    rows = diff(apps, cards, manual_ports=set(manual) | live_ports | legacy_ports)
     out = [{"state": r.state, "only_name": r.only_name, "port": r.port, "title": r.title,
             "changes": r.changes, "reason": r.reason, "old": r.old, "new": r.new} for r in rows]
+    meta["live_ports"] = {"count": len(live_ports), **live_meta}
+    meta["legacy_protected"] = len(legacy_ports)
     return {"success": True, "rows": out, "summary": summarize(rows), "data_source": meta}
 
 
@@ -159,7 +225,9 @@ async def apply(request: Request):
         return JSONResponse({"success": False,
                              "error": "面板卡片枚举失败，已阻止执行（避免重复建卡）：" + str(e)},
                             status_code=409)
-    rows = diff(apps, cards, manual_ports=manual)
+    live_ports, _live_meta = _live_ports()
+    legacy_ports = _legacy_ports()
+    rows = diff(apps, cards, manual_ports=set(manual) | live_ports | legacy_ports)
     bridge = os.environ.get("UGNAS_BRIDGE_BASE", "")
     key = os.environ.get("UGNAS_BRIDGE_KEY", "")
     panel = None
