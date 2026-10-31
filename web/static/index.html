@@ -1,42 +1,375 @@
 <!DOCTYPE html>
 <html lang="zh-CN"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ugnas-bridge</title>
+<title>ugnas-bridge 管理台</title>
 <style>
-:root{--bg:#111;--bg2:#1e1e22;--border:#2e2e34;--text:#e8e8ea;--muted:#9a9aa3;--blue:#4f8cff;--red:#ef4444;--green:#22c55e}
+:root{--bg:#111;--bg2:#1e1e22;--bg3:#26262b;--border:#2e2e34;--text:#e8e8ea;--muted:#9a9aa3;--muted2:#6f6f78;
+--green:#22c55e;--green-bg:rgba(34,197,94,.12);--red:#ef4444;--red-bg:rgba(239,68,68,.12);
+--amber:#f59e0b;--amber-bg:rgba(245,158,11,.12);--blue:#4f8cff;--blue-bg:rgba(79,140,255,.12);
+--gray:#8b8b93;--gray-bg:rgba(139,139,147,.12);--radius:12px;--rs:8px}
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg);color:var(--text);font-family:system-ui,"PingFang SC","Microsoft YaHei";display:flex;min-height:100vh;align-items:center;justify-content:center}
-.card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:28px;width:360px}
-h1{font-size:1.15rem;margin-bottom:6px}
-p.sub{color:var(--muted);font-size:.85rem;margin-bottom:18px}
-input{width:100%;padding:10px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);margin-bottom:12px}
-button{width:100%;padding:10px;border:0;border-radius:8px;background:var(--blue);color:#fff;font-size:.95rem;cursor:pointer}
-.msg{font-size:.85rem;margin-top:10px;min-height:1.2em}
-.err{color:var(--red)}.ok{color:var(--green)}
+body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;line-height:1.5;min-height:100vh}
+a{color:var(--blue);text-decoration:none}button{font-family:inherit;cursor:pointer;border:none}
+input,select,textarea{font-family:inherit;font-size:.95rem;color:var(--text);background:var(--bg);border:1px solid var(--border);border-radius:var(--rs);padding:9px 12px;width:100%;outline:none}
+.hide{display:none!important}
+/* login */
+.center{display:flex;min-height:100vh;align-items:center;justify-content:center;padding:16px}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:24px}
+.login{width:380px;max-width:100%}
+.login h1{font-size:1.2rem;margin-bottom:4px}.login p{color:var(--muted);font-size:.85rem;margin-bottom:18px}
+.btn{background:var(--blue);color:#fff;border-radius:var(--rs);padding:9px 16px;font-size:.92rem}
+.btn.ghost{background:var(--bg3);color:var(--text);border:1px solid var(--border)}
+.btn.red{background:var(--red)}.btn.green{background:var(--green)}.btn:disabled{opacity:.5;cursor:not-allowed}
+.msg{font-size:.84rem;margin-top:10px;min-height:1.1em}.err{color:var(--red)}.ok{color:var(--green)}
+/* shell */
+.top{display:flex;align-items:center;gap:18px;padding:12px 22px;border-bottom:1px solid var(--border);background:var(--bg2);position:sticky;top:0;z-index:10}
+.brand{font-weight:600}.nav{display:flex;gap:6px;flex-wrap:wrap}
+.nav button{background:transparent;color:var(--muted);padding:7px 12px;border-radius:var(--rs);font-size:.92rem}
+.nav button.on{background:var(--blue-bg);color:var(--blue)}
+.spacer{flex:1}
+.wrap{padding:22px;max-width:1180px;margin:0 auto}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.stat{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
+.stat .k{color:var(--muted);font-size:.82rem}.stat .v{font-size:1.5rem;font-weight:600;margin-top:6px}
+.section{margin-top:22px}.section h2{font-size:1rem;margin-bottom:12px;color:var(--muted)}
+.panel{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--border);font-size:.9rem}
+th{color:var(--muted);font-weight:500;background:var(--bg3)}
+tr:last-child td{border-bottom:none}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
+.dot.g{background:var(--green)}.dot.r{background:var(--red)}.dot.a{background:var(--amber)}
+.tag{display:inline-block;padding:2px 8px;border-radius:999px;font-size:.76rem;border:1px solid}
+.tag.green{color:var(--green);background:var(--green-bg);border-color:rgba(34,197,94,.35)}
+.tag.amber{color:var(--amber);background:var(--amber-bg);border-color:rgba(245,158,11,.35)}
+.tag.gray{color:var(--gray);background:var(--gray-bg);border-color:rgba(139,139,147,.35)}
+.tag.red{color:var(--red);background:var(--red-bg);border-color:rgba(239,68,68,.35)}
+.toolbar{display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.chip{padding:4px 10px;border-radius:999px;font-size:.8rem;border:1px solid var(--border);color:var(--muted)}
+.chip b{color:var(--text)}
+.chip.new b{color:var(--green)}.chip.upd b{color:var(--amber)}.chip.exp b{color:var(--red)}.chip.same b{color:var(--gray)}
+.syncrow{display:flex;align-items:center;gap:12px;padding:11px 14px;border-bottom:1px solid var(--border);border-left:3px solid transparent}
+.syncrow:last-child{border-bottom:none}
+.syncrow.new{border-left-color:var(--green)}.syncrow.update{border-left-color:var(--amber)}
+.syncrow.expired{border-left-color:var(--red)}.syncrow.same{border-left-color:var(--gray);opacity:.65}
+.syncrow .nm{font-weight:500;min-width:120px}.syncrow .pt{color:var(--muted);font-size:.82rem;min-width:64px}
+.syncrow .sp{flex:1}
+.appcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px;padding:14px}
+.appcard{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:12px}
+.appcard .n{font-weight:500;margin-bottom:6px}.appcard .p{color:var(--muted);font-size:.8rem;line-height:1.6}
+.badge{background:var(--red-bg);color:var(--red);border:1px solid rgba(239,68,68,.4);border-radius:6px;font-size:.72rem;padding:1px 7px;margin-left:8px}
+.fold{color:var(--muted);font-size:.85rem;padding:10px 14px;cursor:pointer;background:var(--bg3)}
+.row{display:flex;gap:10px;align-items:center;margin-bottom:12px}.row label{min-width:96px;color:var(--muted);font-size:.9rem}
+.footerbar{display:flex;gap:12px;align-items:center;padding:14px;background:var(--bg3);border-top:1px solid var(--border)}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:16px;z-index:50}
+.modal .card{width:520px;max-width:100%}
+@media(max-width:860px){.grid4{grid-template-columns:repeat(2,1fr)}.wrap{padding:14px}}
+@media(max-width:560px){
+  .grid4{grid-template-columns:1fr}
+  .top{gap:8px;padding:10px 12px;flex-wrap:nowrap;overflow-x:auto}
+  .brand{white-space:nowrap;font-size:.95rem}
+  .nav{flex-wrap:nowrap}.nav button{padding:6px 9px;font-size:.85rem;white-space:nowrap}
+  #logout{white-space:nowrap}
+  .syncrow{flex-wrap:wrap;row-gap:8px}
+  .syncrow .nm{min-width:0;flex:1 1 100px}
+  .syncrow .pt{min-width:auto;flex:none}
+  .badge{white-space:nowrap}
+  .syncrow select{flex:0 0 auto;margin-left:auto}
+  .footerbar{flex-wrap:wrap}
+}
 </style></head>
-<body><div class="card">
-<h1>ugnas-bridge</h1>
-<p class="sub" id="sub">加载中…</p>
-<input id="pw" type="text" placeholder="管理口令（至少 8 位）" autocomplete="off">
-<button id="go">进入</button>
-<div class="msg" id="msg"></div>
+<body>
+
+<!-- 登录/初始化 -->
+<div id="gate" class="center"><div class="card login">
+  <h1>ugnas-bridge</h1><p id="gateSub">加载中…</p>
+  <input id="pw" type="text" placeholder="管理口令（至少 8 位）" autocomplete="off">
+  <button class="btn" id="gateBtn" style="width:100%;margin-top:12px">进入</button>
+  <div class="msg" id="gateMsg"></div>
+</div></div>
+
+<!-- 主界面 -->
+<div id="shell" class="hide">
+  <div class="top">
+    <div class="brand">ugnas-bridge</div>
+    <div class="nav">
+      <button data-page="dashboard" class="on">仪表盘</button>
+      <button data-page="apps">应用清单</button>
+      <button data-page="sync">同步任务</button>
+      <button data-page="settings">设置</button>
+    </div>
+    <div class="spacer"></div>
+    <button class="btn ghost" id="logout">退出</button>
+  </div>
+  <div class="wrap">
+    <!-- 仪表盘 -->
+    <div id="page-dashboard" class="page">
+      <div class="grid4">
+        <div class="stat"><div class="k">服务状态</div><div class="v" id="sSvc">—</div></div>
+        <div class="stat"><div class="k">应用总数</div><div class="v" id="sApps">—</div></div>
+        <div class="stat"><div class="k">健康</div><div class="v" id="sHealth">—</div></div>
+        <div class="stat"><div class="k">最近同步</div><div class="v" id="sSync">—</div></div>
+      </div>
+      <div class="section"><div class="toolbar" style="margin-bottom:12px"><h2 style="margin:0">应用健康总览</h2><span class="spacer"></span><button class="btn ghost" id="btnHealthRun">立即探测</button><span class="msg" id="healthMsg"></span></div><div class="panel"><table><thead><tr><th>应用</th><th>端口</th><th>状态</th><th>延迟</th><th>检测时间</th></tr></thead><tbody id="dashRows"></tbody></table></div></div>
+    </div>
+    <!-- 应用清单 -->
+    <div id="page-apps" class="page hide">
+      <div class="toolbar">
+        <button class="btn" id="btnDiscover">一键发现</button>
+        <button class="btn ghost" id="btnManual">手动绑定端口</button>
+        <input id="appFilter" placeholder="筛选：名称/端口/来源" style="width:220px">
+        <button class="btn ghost" id="btnViewTable">表格视图</button>
+        <button class="btn ghost" id="btnViewCards">卡片视图</button>
+        <span class="msg" id="appsMsg"></span>
+      </div>
+      <div class="panel" id="appsPanel"><table><thead><tr><th>应用</th><th>端口</th><th>来源</th><th>容器/备注</th></tr></thead><tbody id="appRows"></tbody></table></div>
+    </div>
+    <!-- 同步任务 -->
+    <div id="page-sync" class="page hide">
+      <div class="toolbar">
+        <button class="btn" id="btnPreview">刷新四态预览</button>
+        <button class="btn ghost" id="btnOnlyExp">仅选过期</button>
+        <button class="btn ghost" id="btnSelectAll">全选</button>
+        <span class="msg" id="syncMsg"></span>
+      </div>
+      <div class="msg" id="syncSrc"></div>
+      <div class="chips" id="chips"></div>
+      <div class="panel" id="syncPanel"><div class="fold">点击「刷新四态预览」加载数据</div></div>
+      <div class="footerbar">
+        <span id="selInfo" style="color:var(--muted);font-size:.88rem">未选择</span>
+        <div class="spacer"></div>
+        <button class="btn ghost" id="btnRollback">回滚上次</button>
+        <button class="btn green" id="btnApply" disabled>执行同步（0 项）</button>
+      </div>
+    </div>
+    <!-- 设置 -->
+    <div id="page-settings" class="page hide">
+      <div class="section"><h2>绿联 NAS</h2><div class="panel" style="padding:16px">
+        <div class="row"><label>访问地址</label><input id="ugBase" placeholder="https://xxx.ug.link"></div>
+        <div class="row"><label>用户名</label><input id="ugUser" placeholder="dhadmin"></div>
+        <div class="row"><label>密码</label><input id="ugCred" type="text" placeholder="留空表示不修改"></div>
+        <div class="row"><label></label><button class="btn ghost" id="btnTestUg">测试连接</button><span class="msg" id="ugMsg"></span></div>
+      </div></div>
+      <div class="section"><h2>Sun-Panel</h2><div class="panel" style="padding:16px">
+        <div class="row"><label>面板地址</label><input id="spBase" placeholder="http://ip:3002"></div>
+        <div class="row"><label>OpenAPI Token</label><input id="spToken" type="text" placeholder="留空表示不修改"></div>
+        <div class="row"><label>管理员账号</label><input id="spAdminUser" placeholder="可选，填了才解锁删除/深度管理"></div>
+        <div class="row"><label>管理员口令</label><input id="spAdminCred" type="text" placeholder="可选，加密存储、不回显"></div>
+        <div class="row"><label></label><button class="btn ghost" id="btnTestSp">测试连接</button><button class="btn ghost" id="btnRemoveAdmin">移除管理员</button><span class="msg" id="spMsg"></span><span class="tag gray" id="delState">删除：未解锁</span></div>
+      </div></div>
+      <div class="section"><h2>健康监测</h2><div class="panel" style="padding:16px">
+        <div class="row"><label>探测地址</label><input id="healthHost" placeholder="NAS 内网 IP 或 Tailscale IP（如 100.111.245.21）"></div>
+        <div class="row"><label></label><span style="color:var(--muted);font-size:.85rem">用于仪表盘端口可达性探测；未配置时显示「未探测」，不伪造绿色状态</span></div>
+      </div></div>
+      <div class="toolbar" style="margin-top:16px"><button class="btn" id="btnSaveCfg">保存配置</button><span class="msg" id="cfgMsg"></span></div>
+    </div>
+  </div>
 </div>
+
+<!-- 手动绑定弹窗 -->
+<div id="modal" class="modal hide"><div class="card">
+  <h2 style="font-size:1.05rem;margin-bottom:6px">手动绑定端口</h2>
+  <p style="color:var(--muted);font-size:.85rem;margin-bottom:12px">支持批量粘贴，每行「端口 可选名称」或逗号分隔。例：6080 vnc</p>
+  <textarea id="manualText" rows="7" placeholder="6080 vnc&#10;5199 openchatcat"></textarea>
+  <div class="msg" id="manualMsg"></div>
+  <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px">
+    <button class="btn ghost" id="mCancel">取消</button><button class="btn" id="mOk">绑定</button>
+  </div>
+</div></div>
+
 <script>
 const PW='pass'+'word';
-const $=s=>document.querySelector(s);
+const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
+let STATE={rows:[],sel:new Set(),dispose:{},lastSnap:''};
 document.getElementById('pw').type=PW;
+
+async function api(url,opt){const r=await fetch(url,Object.assign({headers:{'Content-Type':'application/json'}},opt||{}));let j={};try{j=await r.json()}catch(e){};return {status:r.status,body:j};}
+function show(id){$$('.page').forEach(p=>p.classList.add('hide'));$('#page-'+id).classList.remove('hide');$$('.nav button').forEach(b=>b.classList.toggle('on',b.dataset.page===id));location.hash=id;if(id==='sync'&&!STATE.rows.length)loadPreview();}
+
+/* 登录门 */
 (async()=>{
-  const r=await fetch('/api/setup/status'); const j=await r.json();
-  window._setup=!!j.needs_setup;
-  $('#sub').textContent = window._setup ? '首次部署：设置管理口令' : '登录管理页';
-  $('#go').textContent = window._setup ? '设置并进入' : '登录';
+  const r=await api('/api/setup/status');
+  window._setup=!!(r.body&&r.body.needs_setup);
+  $('#gateSub').textContent=window._setup?'首次部署：设置管理口令':'登录管理台';
+  $('#gateBtn').textContent=window._setup?'设置并进入':'登录';
+  const s=await api('/api/session'); if(s.body&&s.body.authed) enter();
 })();
-$('#go').onclick=async()=>{
-  const pw=$('#pw').value.trim(); if(pw.length<8){$('#msg').className='msg err';$('#msg').textContent='口令至少 8 位';return;}
-  const url=window._setup?'/api/setup':'/api/login';
-  const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({[PW]:pw})});
-  const j=await r.json();
-  if(j.ok){$('#msg').className='msg ok';$('#msg').textContent='成功，正在进入…';setTimeout(()=>location.href='/',400);}
-  else{$('#msg').className='msg err';$('#msg').textContent=j.error||'失败';}
+$('#gateBtn').onclick=async()=>{
+  const pw=$('#pw').value.trim(); if(pw.length<8){$('#gateMsg').className='msg err';$('#gateMsg').textContent='口令至少 8 位';return;}
+  const body={}; body[PW]=pw;
+  const r=await api(window._setup?'/api/setup':'/api/login',{method:'POST',body:JSON.stringify(body)});
+  if(r.body&&r.body.ok){enter();}else{$('#gateMsg').className='msg err';$('#gateMsg').textContent=(r.body&&r.body.error)||'失败';}
 };
-</script></body></html>
+function enter(){$('#gate').classList.add('hide');$('#shell').classList.remove('hide');loadAll();const h=(location.hash||'').replace('#','');if(h){show(h);}}
+$('#logout').onclick=async()=>{await api('/api/logout',{method:'POST'});location.reload();};
+
+/* 导航 */
+$$('.nav button').forEach(b=>b.onclick=()=>show(b.dataset.page));
+
+function fmtTime(ts){if(!ts)return '';const d=new Date(ts*1000);const p=n=>String(n).padStart(2,'0');return `${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;}
+async function loadAll(){await Promise.all([loadHealth(),loadApps()]);}
+async function loadHealth(){
+  const h=await api('/api/health'); const configured=h.body.configured||{};
+  $('#sSvc').textContent=(h.body.ok?'在线':'离线');
+  $('#sSvc').style.color=h.body.ok?'var(--green)':'var(--red)';
+  const a=await api('/api/apps'); const apps=(a.body&&a.body.apps)||[];
+  $('#sApps').textContent=apps.length;
+  const d=await api('/api/health/detail'); const hd=(d.body||{});
+  if(hd.configured===false){$('#sHealth').textContent='未探测';$('#sHealth').style.color='var(--muted)';}
+  else{const total=hd.total||0,up=hd.up||0;$('#sHealth').textContent=`${up} / ${total}`;$('#sHealth').style.color=(total&&up===total)?'var(--green)':(total?'var(--red)':'var(--muted)');}
+  $('#sSync').textContent=STATE.lastSnap?'已快照':'—';
+  const rows=hd.rows||[];
+  if(!rows.length){$('#dashRows').innerHTML=`<tr><td colspan="5" style="color:var(--muted)">${hd.error||'暂无健康数据，先去「应用清单」一键发现'}</td></tr>`;}
+  else{$('#dashRows').innerHTML=rows.map(x=>`<tr><td>${x.app}</td><td>${x.port}</td><td><span class="dot ${x.up?'g':'r'}"></span>${x.up?'可达':'不可达'}</td><td>${x.latency_ms==null?'—':x.latency_ms+' ms'}</td><td>${fmtTime(x.checked_at)}</td></tr>`).join('');}
+}
+let APPVIEW='table',APPCACHE=[];
+async function loadApps(){const a=await api('/api/apps'); APPCACHE=(a.body&&a.body.apps)||[]; renderApps();}
+function renderApps(){
+  const q=($('#appFilter').value||'').trim().toLowerCase();
+  const rows=APPCACHE.filter(x=>!q||(x.name||'').toLowerCase().includes(q)||(x.ports||[]).join(',').includes(q)||(SRC[x.source]||x.source||'').includes(q));
+  if(APPVIEW==='cards'){
+    $('#appsPanel').innerHTML=`<div class="appcards">${rows.length?rows.map(x=>`<div class="appcard"><div class="n">${x.name}</div><div class="p">端口 ${(x.ports||[]).join(', ')||'—'}</div><div class="p">${SRC[x.source]||x.source||''}</div></div>`).join(''):'<div class="p" style="padding:14px;color:var(--muted)">暂无应用</div>'}</div>`;
+  }else{
+    $('#appsPanel').innerHTML=`<table><thead><tr><th>应用</th><th>端口</th><th>来源</th><th>容器/备注</th></tr></thead><tbody id="appRows">${rows.length?rows.map(x=>`<tr><td>${x.name}</td><td>${(x.ports||[]).join(',')}</td><td>${SRC[x.source]||x.source}</td><td>${x.container_id||''}</td></tr>`).join(''):'<tr><td colspan="4" style="color:var(--muted)">暂无应用</td></tr>'}</tbody></table>`;
+  }
+}
+$('#appFilter').oninput=renderApps;
+$('#btnViewTable').onclick=()=>{APPVIEW='table';renderApps();};
+$('#btnViewCards').onclick=()=>{APPVIEW='cards';renderApps();};
+$('#btnHealthRun').onclick=async()=>{$('#healthMsg').className='msg';$('#healthMsg').textContent='探测中…';const r=await api('/api/health/run',{method:'POST'});const b=r.body||{};if(b.configured===false){$('#healthMsg').className='msg err';$('#healthMsg').textContent=b.error||'未配置探测地址';}else{$('#healthMsg').className='msg ok';$('#healthMsg').textContent=`完成：可达 ${b.up||0} / ${b.total||0}`;}loadHealth();};
+
+/* 发现 / 手动绑定 */
+$('#btnDiscover').onclick=async()=>{
+  let sec=0;$('#appsMsg').className='msg';$('#appsMsg').textContent='发现中… 0s（通常 2-3 分钟）';
+  const timer=setInterval(()=>{sec+=3;$('#appsMsg').textContent=`发现中… ${sec}s（通常 2-3 分钟）`;},3000);
+  try{const r=await api('/api/discover/run',{method:'POST'});const b=r.body||{};$('#appsMsg').className='msg '+(b.success?'ok':'err');$('#appsMsg').textContent=b.success?('完成，共 '+b.count+' 个，来源 '+JSON.stringify(b.sources)):(b.error||'失败');loadAll();}
+  finally{clearInterval(timer);}
+};
+$('#btnManual').onclick=()=>$('#modal').classList.remove('hide');
+$('#mCancel').onclick=()=>$('#modal').classList.add('hide');
+$('#mOk').onclick=async()=>{
+  const lines=$('#manualText').value.split(/\n|,/).map(s=>s.trim()).filter(Boolean);const ports=[],names={},invalid=[];
+  lines.forEach(l=>{const m=l.split(/\s+/);const p=parseInt(m[0]);if(!p||p<1||p>65535){invalid.push(m[0]);return;}if(!ports.includes(p))ports.push(p);if(m[1])names[p]=m[1];});
+  if(!ports.length){$('#manualMsg').className='msg err';$('#manualMsg').textContent=invalid.length?('端口不合法：'+invalid.join(',')):'没解析到端口';return;}
+  const r=await api('/api/apps/manual',{method:'POST',body:JSON.stringify({ports,names})});const b=r.body||{};
+  if(b.success){$('#manualMsg').className='msg '+(b.added?'ok':'err');$('#manualMsg').textContent=`已添加 ${b.added} 个${b.skipped?('，跳过重复 '+b.skipped+' 个'):''}${b.invalid&&b.invalid.length?('，非法端口 '+b.invalid.join(',')):''}`;if(b.added){setTimeout(()=>{ $('#modal').classList.add('hide');$('#manualMsg').textContent='';},800);}loadAll();}
+  else{$('#manualMsg').className='msg err';$('#manualMsg').textContent=b.error||'失败';}
+};
+
+/* 四态同步 */
+const STLABEL={new:['新增','green'],update:['更新','amber'],expired:['过期','red'],same:['无变化','gray']};
+const DISP={skip:'跳过',trash:'移回收站',delete:'删除卡片'};
+const SRC={portMapping:'API','container-scan':'容器扫描','env+listen':'环境+监听',manual:'手动',unknown:'未知'};
+$('#btnPreview').onclick=loadPreview;
+async function loadPreview(){
+  $('#syncMsg').className='msg';$('#syncMsg').textContent='加载中…';
+  const r=await api('/api/sync/preview',{method:'POST'}); const b=r.body||{};
+  if(!b.success){$('#syncMsg').className='msg err';$('#syncMsg').textContent=b.error||'预览失败';return;}
+  STATE.rows=b.rows||[]; STATE.sel=new Set(); STATE.dispose={};
+  STATE.stale=!!(b.data_source&&b.data_source.stale); STATE.source=b.data_source||{};
+  if(STATE.stale){
+    $('#syncSrc').className='msg err';
+    $('#syncSrc').textContent='⚠ 数据源：本地快照（可能过期）'+((b.data_source.errors&&b.data_source.errors.length)?('：'+b.data_source.errors.join('；')):'')+' —— 面板枚举恢复前禁止执行';
+  }else{
+    $('#syncSrc').className='msg ok';
+    $('#syncSrc').textContent=`数据源：面板实时枚举（${(b.data_source&&b.data_source.count)||0} 张卡片）`;
+  }
+  renderSync(b.summary); $('#syncMsg').textContent='';
+}
+function renderSync(sum){
+  const chips=$('#chips'); chips.innerHTML=
+    `<span class="chip new">新增 <b>${sum.new||0}</b></span><span class="chip upd">更新 <b>${sum.update||0}</b></span>`+
+    `<span class="chip exp">过期 <b>${sum.expired||0}</b></span><span class="chip same">无变化 <b>${sum.same||0}</b></span>`;
+  const order=['new','update','expired','same']; let html='';
+  order.forEach(st=>{
+    const rows=STATE.rows.filter(r=>r.state===st); if(!rows.length) return;
+    if(st==='same'){ html+=`<div class="fold" id="foldSame">无变化 ${rows.length} 项，点击展开 ▾</div><div id="sameBox" class="hide">`+rows.map(rowHtml).join('')+`</div>`; return; }
+    html+=rows.map(rowHtml).join('');
+  });
+  $('#syncPanel').innerHTML=html||'<div class="fold">无差异</div>';
+  bindRows(); updateFooter();
+}
+function rowHtml(r){
+  const [lab,cls]=STLABEL[r.state]; const checked=STATE.sel.has(r.only_name)?'checked':'';
+  const canCheck=r.state==='new'||r.state==='update'||r.state==='expired';
+  let extra='';
+  if(r.state==='expired'){
+    const cur=STATE.dispose[r.only_name]||'skip';
+    extra=`<select data-disp="${r.only_name}" style="width:auto;padding:5px 8px">`+
+      ['skip','trash','delete'].map(v=>`<option value="${v}" ${cur===v?'selected':''}>${DISP[v]}</option>`).join('')+`</select>`;
+  }
+  return `<div class="syncrow ${r.state}">
+    ${canCheck?`<input type="checkbox" data-sel="${r.only_name}" ${checked} style="width:16px;width:16px;flex:none">`:'<span style="width:16px;flex:none"></span>'}
+    <span class="nm">${r.title||r.only_name}</span><span class="pt">${r.port}</span>
+    <span class="tag ${cls}">${lab}</span>${r.state==='expired'?'<span class="badge">清理建议</span>':''}
+    <span class="sp"></span>${extra}</div>`;
+}
+function bindRows(){
+  $$('[data-sel]').forEach(cb=>cb.onchange=()=>{const k=cb.dataset.sel;cb.checked?STATE.sel.add(k):STATE.sel.delete(k);updateFooter();});
+  $$('[data-disp]').forEach(s=>s.onchange=()=>{STATE.dispose[s.dataset.disp]=s.value;});
+  const fold=$('#foldSame'); if(fold) fold.onclick=()=>$('#sameBox').classList.toggle('hide');
+}
+function updateFooter(){
+  const n=STATE.sel.size; const stale=!!STATE.stale;
+  $('#btnApply').textContent=stale?'执行同步（已阻止：数据源过期）':`执行同步（${n} 项）`;
+  $('#btnApply').disabled=!n||stale;
+  $('#selInfo').textContent=n?`已选 ${n} 项`:'未选择';
+}
+$('#btnOnlyExp').onclick=()=>{STATE.rows.filter(r=>r.state==='expired').forEach(r=>STATE.sel.add(r.only_name));renderSync(countSummary());};
+$('#btnSelectAll').onclick=()=>{const all=STATE.rows.filter(r=>r.state!=='same');const isAll=all.length&&all.every(r=>STATE.sel.has(r.only_name));all.forEach(r=>isAll?STATE.sel.delete(r.only_name):STATE.sel.add(r.only_name));renderSync(countSummary());};
+function countSummary(){const s={new:0,update:0,expired:0,same:0};STATE.rows.forEach(r=>s[r.state]++);return s;}
+$('#btnApply').onclick=async()=>{
+  $('#syncMsg').className='msg';$('#syncMsg').textContent='执行中…';
+  const r=await api('/api/sync/apply',{method:'POST',body:JSON.stringify({selected:[...STATE.sel],dispose:STATE.dispose})});
+  const b=r.body||{};
+  if(r.status===200&&b.success){
+    STATE.lastSnap=b.snapshot||'';
+    let txt=`完成：成功 ${b.ok}，失败 ${b.fail}，已快照`;
+    if(b.fail){
+      const errs=(b.results||[]).filter(x=>!x.ok).slice(0,3).map(x=>`${x.only_name}: ${x.error||''}`);
+      txt+='；失败明细：'+errs.join(' | ');
+      $('#syncMsg').className='msg err';
+    }else{$('#syncMsg').className='msg ok';}
+    $('#syncMsg').textContent=txt;
+    if(!STATE.stale)loadPreview();
+  }else{$('#syncMsg').className='msg err';$('#syncMsg').textContent=b.error||('执行失败（HTTP '+r.status+'）');}
+};
+$('#btnRollback').onclick=async()=>{
+  if(!STATE.lastSnap){$('#syncMsg').className='msg err';$('#syncMsg').textContent='本会话没有快照';return;}
+  const r=await api('/api/sync/rollback',{method:'POST',body:JSON.stringify({snapshot:STATE.lastSnap})});const b=r.body||{};
+  $('#syncMsg').className='msg '+(b.success?'ok':'err');$('#syncMsg').textContent=b.success?`回滚成功 ${b.ok} 项${b.fail?('，失败 '+b.fail):''}`:(b.error||'回滚失败');
+};
+
+/* 设置：测试连接带 10s 冷却 */
+let lastUg=0,lastSp=0;
+function cooldown(which){const now=Date.now();const last=which==='ug'?lastUg:lastSp;if(now-last<10000){return Math.ceil((10000-(now-last))/1000);}which==='ug'?lastUg=now:lastSp=now;return 0;}
+$('#btnTestUg').onclick=async()=>{const w=cooldown('ug');if(w){$('#ugMsg').className='msg err';$('#ugMsg').textContent=`请 ${w}s 后再试（防打挂 NAS 登录）`;return;}
+  $('#ugMsg').className='msg';$('#ugMsg').textContent='测试中…';
+  const body={base:$('#ugBase').value.trim(),user:$('#ugUser').value.trim(),cred:$('#ugCred').value.trim()};
+  const r=await api('/api/test/ugreen',{method:'POST',body:JSON.stringify(body)});
+  $('#ugMsg').className='msg '+(r.body.ok?'ok':'err');$('#ugMsg').textContent=r.body.ok?('成功：'+(r.body.nas_name||'')+(r.body.system_version||'')):(r.body.error||'失败');};
+$('#btnTestSp').onclick=async()=>{const w=cooldown('sp');if(w){$('#spMsg').className='msg err';$('#spMsg').textContent=`请 ${w}s 后再试`;return;}
+  $('#spMsg').className='msg';$('#spMsg').textContent='测试中…';
+  const r=await api('/api/test/sunpanel',{method:'POST',body:JSON.stringify({base:$('#spBase').value.trim(),token:$('#spToken').value.trim()})});
+  $('#spMsg').className='msg '+(r.body.ok?'ok':'err');$('#spMsg').textContent=r.body.ok?('成功：v'+(r.body.version||'')):(r.body.error||'失败');};
+$('#btnSaveCfg').onclick=async()=>{
+  const ug={base:$('#ugBase').value.trim(),user:$('#ugUser').value.trim()};if($('#ugCred').value.trim())ug.cred=$('#ugCred').value.trim();
+  const sp={base:$('#spBase').value.trim()};if($('#spToken').value.trim())sp.token=$('#spToken').value.trim();
+  const health={host:$('#healthHost').value.trim()};
+  const r1=await api('/api/config/ugreen',{method:'POST',body:JSON.stringify(ug)});
+  const r2=await api('/api/config/sunpanel',{method:'POST',body:JSON.stringify(sp)});
+  const r3=await api('/api/config/health',{method:'POST',body:JSON.stringify(health)});
+  if($('#spAdminUser').value.trim()){await api('/api/config/sunpanel_admin',{method:'POST',body:JSON.stringify({user:$('#spAdminUser').value.trim(),cred:$('#spAdminCred').value.trim()})});}
+  const ok=(r1.body&&r1.body.success)&&(r2.body&&r2.body.success)&&(r3.body&&r3.body.success);
+  $('#cfgMsg').className='msg '+(ok?'ok':'err');$('#cfgMsg').textContent=ok?'已保存（加密落盘）':'保存失败';
+};
+$('#btnRemoveAdmin').onclick=async()=>{
+  if(!confirm('确定移除 Sun-Panel 管理员账号？移除后删除功能将上锁（默认仅支持移回收站）。'))return;
+  const r=await api('/api/config/sunpanel_admin',{method:'DELETE'});const b=r.body||{};
+  if(b.success){$('#spAdminUser').value='';$('#spAdminCred').value='';$('#delState').textContent='删除：未解锁';$('#delState').className='tag gray';$('#spMsg').className='msg ok';$('#spMsg').textContent='管理员账号已移除';}
+  else{$('#spMsg').className='msg err';$('#spMsg').textContent=b.error||'移除失败';}
+};
+(async()=>{const c=await api('/api/config');if(c.body){$('#ugBase').value=(c.body.ugreen||{}).base||'';$('#ugUser').value=(c.body.ugreen||{}).user||'';$('#spBase').value=(c.body.sunpanel||{}).base||'';$('#spAdminUser').value=(c.body.sunpanel_admin||{}).user||'';$('#healthHost').value=(c.body.health||{}).host||'';const on=!!(c.body.sunpanel_admin||{}).user;$('#delState').textContent=on?'删除：已解锁':'删除：未解锁';$('#delState').className='tag '+(on?'green':'gray');}})();
+</script>
+</body></html>
