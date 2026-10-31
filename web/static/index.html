@@ -156,6 +156,7 @@ tr:last-child td{border-bottom:none}
         <div class="row"><label>OpenAPI Token</label><input id="spToken" type="text" placeholder="留空表示不修改"></div>
         <div class="row"><label>管理员账号</label><input id="spAdminUser" placeholder="可选，填了才解锁删除/深度管理"></div>
         <div class="row"><label>管理员口令</label><input id="spAdminCred" type="text" placeholder="可选，加密存储、不回显"></div>
+        <div class="row"><label></label><span style="color:var(--muted);font-size:.85rem">同步只管理带唯一标识（onlyName）的卡片；面板中无标识的卡片不参与四态，避免误改。</span></div>
         <div class="row"><label></label><button class="btn ghost" id="btnTestSp">测试连接</button><button class="btn ghost" id="btnRemoveAdmin">移除管理员</button><span class="msg" id="spMsg"></span><span class="tag gray" id="delState">删除：未解锁</span></div>
       </div></div>
       <div class="section"><h2>健康监测</h2><div class="panel" style="padding:16px">
@@ -261,9 +262,9 @@ $('#mOk').onclick=async()=>{
 const STLABEL={new:['新增','green'],update:['更新','amber'],expired:['过期','red'],same:['无变化','gray']};
 const DISP={skip:'跳过',trash:'移回收站',delete:'删除卡片'};
 const SRC={portMapping:'API','container-scan':'容器扫描','env+listen':'环境+监听',manual:'手动',unknown:'未知'};
-$('#btnPreview').onclick=loadPreview;
-async function loadPreview(){
-  $('#syncMsg').className='msg';$('#syncMsg').textContent='加载中…';
+$('#btnPreview').onclick=()=>loadPreview();
+async function loadPreview(keepMsg){
+  if(!keepMsg){$('#syncMsg').className='msg';$('#syncMsg').textContent='加载中…';}
   const r=await api('/api/sync/preview',{method:'POST'}); const b=r.body||{};
   if(!b.success){$('#syncMsg').className='msg err';$('#syncMsg').textContent=b.error||'预览失败';return;}
   STATE.rows=b.rows||[]; STATE.sel=new Set(); STATE.dispose={};
@@ -273,9 +274,11 @@ async function loadPreview(){
     $('#syncSrc').textContent='⚠ 数据源：本地快照（可能过期）'+((b.data_source.errors&&b.data_source.errors.length)?('：'+b.data_source.errors.join('；')):'')+' —— 面板枚举恢复前禁止执行';
   }else{
     $('#syncSrc').className='msg ok';
-    $('#syncSrc').textContent=`数据源：面板实时枚举（${(b.data_source&&b.data_source.count)||0} 张卡片）`;
+    const _cnt=(b.data_source&&b.data_source.count)||0;
+    const _skip=(b.data_source&&b.data_source.skipped_no_name)||0;
+    $('#syncSrc').textContent=`数据源：面板实时枚举（${_cnt} 张卡片）`+(_skip?`；另有 ${_skip} 张卡片无唯一标识（onlyName 为空），未纳入同步管理`:'');
   }
-  renderSync(b.summary); $('#syncMsg').textContent='';
+  renderSync(b.summary); if(!keepMsg)$('#syncMsg').textContent='';
 }
 function renderSync(sum){
   const chips=$('#chips'); chips.innerHTML=
@@ -326,13 +329,14 @@ $('#btnApply').onclick=async()=>{
   if(r.status===200&&b.success){
     STATE.lastSnap=b.snapshot||'';
     let txt=`完成：成功 ${b.ok}，失败 ${b.fail}，已快照`;
+    let cls='ok';
     if(b.fail){
       const errs=(b.results||[]).filter(x=>!x.ok).slice(0,3).map(x=>`${x.only_name}: ${x.error||''}`);
       txt+='；失败明细：'+errs.join(' | ');
-      $('#syncMsg').className='msg err';
-    }else{$('#syncMsg').className='msg ok';}
-    $('#syncMsg').textContent=txt;
-    if(!STATE.stale)loadPreview();
+      cls='err';
+    }
+    if(!STATE.stale)await loadPreview(true);
+    $('#syncMsg').className='msg '+cls;$('#syncMsg').textContent=txt;
   }else{$('#syncMsg').className='msg err';$('#syncMsg').textContent=b.error||('执行失败（HTTP '+r.status+'）');}
 };
 $('#btnRollback').onclick=async()=>{

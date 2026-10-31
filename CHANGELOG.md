@@ -24,11 +24,12 @@
   - P1-1~P1-5：失败明细展示、测试连接合并已存凭据、保存配置字段级合并、健康探测改 `health.host` + TCP 探测、应用清单卡片视图/筛选
   - P2-1/2/3/5/6：移除管理员、全选、端口校验去重、中文登录提示、回滚还原标题/分组/重建删除卡
   - 详见 `docs/21-QA修复记录.md`；单测 13 passed + 本地 mock 面板端到端 PASS
+  - **QA 复测修复（2026-10-31 第二轮）**：P1-6 同步成功提示保留（loadPreview keepMsg）；P2-7 `/api/health` 的 health 状态按有效探测地址判断；P2-8 同步页/设置页明示空 onlyName 卡片数量；单测 16 passed，详见 `docs/24-QA复测修复-20261031.md`
 
 ### 验收备注（v2.0.0）
 - amd64 功能验收：华为云 venv 裸机 8771 全链路 PASS（发现 36、四态预览、/open 302、verify PASS）
 - Sun-Panel 同步链路补验 PASS（四态 new24/update2/expired14/same11 实时面板；3 卡同步/回滚演练）
-- QA 3 P0 真实面板复验 PASS（见 docs/22）
+- QA 3 P0 真实面板复验 PASS（见 docs/22）；QA 复测 13/14 项关闭、P1-6 已复修（见 docs/24）
 
 ### 已知限制
 - **arm64 运行验证：v2.1 补**（NAS SSH 通道受限）
