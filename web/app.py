@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""ugnas-bridge v2 · FastAPI 应用入口"""
+"""ugnas-bridge v2 · FastAPI 应用入口（F1-1：路由分层 + 管理认证）
+
+- /api/* 默认需管理会话；白名单：health / setup* / login / session
+- /open/{port} 免登录，靠 ?k= 口令校验
+- /           返回管理页静态单页
+"""
 from __future__ import annotations
 
 import os
@@ -20,7 +25,7 @@ from service.health_service import HealthService  # noqa: E402
 from web import security                          # noqa: E402
 from web.api import auth, config, discover, open as openapi, sync, system  # noqa: E402
 
-app = FastAPI(title="ugnas-bridge", version="2.0.0-dev")
+app = FastAPI(title="ugnas-bridge", version="2.0.0")
 init_db()
 LOG = setup_logging()
 _health = HealthService()
@@ -51,7 +56,7 @@ PUBLIC_API = {
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
     path = request.url.path
-    # 仅本地截图/演示：UGNAS_DEMO_AUTH=1 跳过鉴权，生产不要设
+    # 仅本地截图/演示用：UGNAS_DEMO_AUTH=1 跳过鉴权，生产环境不要设
     if os.environ.get("UGNAS_DEMO_AUTH") == "1":
         return await call_next(request)
     if path.startswith("/api/") and path not in PUBLIC_API:

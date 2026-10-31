@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""系统路由：健康检查 + 测试连接。"""
+"""系统路由：健康检查 + 测试连接。
+
+2026-10-31 QA 修复（P1-2）：测试连接按「字段级合并」使用已保存配置——
+前端传空字符串表示「沿用已存值」，不再把空凭据发给后端导致必然失败。
+"""
 from __future__ import annotations
 
 import requests
@@ -14,6 +18,7 @@ router = APIRouter(prefix="/api", tags=["system"])
 
 
 def _cfg(k: str):
+    """读取配置（密文由 config 路由写入，此处仅判存在）。"""
     c = connect()
     try:
         return c.execute("SELECT ts FROM config WHERE k=?", (k,)).fetchone() is not None
@@ -21,10 +26,23 @@ def _cfg(k: str):
         c.close()
 
 
+def _merge_cfg(kind: str, body: dict) -> dict:
+    from web.api.config import get_cfg
+    out = dict(get_cfg(kind) or {})
+    for k, v in (body or {}).items():
+        if v is None:
+            continue
+        if isinstance(v, str) and not v.strip():
+            continue  # 空 = 沿用已存值
+        out[k] = v.strip() if isinstance(v, str) else v
+    return out
+
+
 @router.get("/health")
 def health():
-    return {"ok": True, "version": "2.0.0-dev", "service": "ugnas-bridge",
-            "configured": {"ugreen": _cfg("ugreen"), "sunpanel": _cfg("sunpanel")}}
+    return {"ok": True, "version": "2.0.0", "service": "ugnas-bridge",
+            "configured": {"ugreen": _cfg("ugreen"), "sunpanel": _cfg("sunpanel"),
+                           "health": _cfg("health")}}
 
 
 @router.get("/health/detail")
@@ -41,31 +59,33 @@ def health_run():
 
 @router.post("/test/ugreen")
 async def test_ugreen(request: Request):
-    from web.api.config import get_cfg
-    body = await request.json()
-    if not (body or {}).get("base"):
-        body = get_cfg("ugreen") or {}
+    body = _merge_cfg("ugreen", await request.json())
+    if not body.get("base") or not body.get("user") or not body.get("cred"):
+        return JSONResponse(status_code=400,
+                            content={"success": False, "error": "请先填写并保存绿联地址/用户名/密码"})
     try:
         c = UgosClient(body["base"])
         d = c.login(body["user"], body["cred"])
-        return {"ok": True, "nas_name": d.get("nas_name"), "model": d.get("model"),
+        return {"success": True, "ok": True, "nas_name": d.get("nas_name"), "model": d.get("model"),
                 "system_version": d.get("system_version")}
-    except Exception as e:
-        return JSONResponse(status_code=400, content={"ok": False, "error": str(e)[:200]})
+    except Exception as e:  # noqa: BLE001
+        return JSONResponse(status_code=400, content={"success": False, "error": f"绿联连接失败：{str(e)[:200]}"})
 
 
 @router.post("/test/sunpanel")
 async def test_sunpanel(request: Request):
-    from web.api.config import get_cfg
-    body = await request.json()
-    if not (body or {}).get("base"):
-        body = get_cfg("sunpanel") or {}
+    body = _merge_cfg("sunpanel", await request.json())
+    if not body.get("base") or not body.get("token"):
+        return JSONResponse(status_code=400,
+                            content={"success": False, "error": "请先填写并保存 Sun-Panel 地址/OpenAPI Token"})
     try:
         r = requests.post(f"{body['base'].rstrip('/')}/openapi/v1/version",
                           headers={"token": body["token"], "Content-Type": "application/json"},
                           json={}, timeout=10)
         j = r.json()
-        return {"ok": j.get("code") == 0, "code": j.get("code"),
-                "version": (j.get("data") or {}).get("version")}
-    except Exception as e:
-        return JSONResponse(status_code=400, content={"ok": False, "error": str(e)[:200]})
+        ok = j.get("code") == 0
+        return {"success": ok, "ok": ok, "code": j.get("code"),
+                "version": (j.get("data") or {}).get("version"),
+                "error": "" if ok else f"面板返回 code={j.get('code')} msg={j.get('msg', '')}"}
+    except Exception as e:  # noqa: BLE001
+        return JSONResponse(status_code=400, content={"success": False, "error": f"Sun-Panel 连接失败：{str(e)[:200]}"})

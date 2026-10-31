@@ -36,6 +36,11 @@ MIGRATIONS = {
         "CREATE TABLE IF NOT EXISTS health(app TEXT PRIMARY KEY, port INTEGER, up INTEGER, latency_ms INTEGER, checked_at INTEGER)",
         "CREATE TABLE IF NOT EXISTS audit(id INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER, actor TEXT, action TEXT, target TEXT, result TEXT)",
     ],
+    # v2：health 以 (app,port) 为键；旧表按 app 去重会导致多端口应用统计口径不一致（QA P1-4）
+    2: [
+        "DROP TABLE IF EXISTS health",
+        "CREATE TABLE IF NOT EXISTS health(app TEXT NOT NULL, port INTEGER NOT NULL, up INTEGER, latency_ms INTEGER, checked_at INTEGER, PRIMARY KEY(app,port))",
+    ],
 }
 
 
