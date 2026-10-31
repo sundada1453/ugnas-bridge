@@ -4,6 +4,7 @@
 
 2026-10-31 QA 修复（P1-2）：测试连接按「字段级合并」使用已保存配置——
 前端传空字符串表示「沿用已存值」，不再把空凭据发给后端导致必然失败。
+2026-10-31 QA 复测（P2-7）：configured.health 改为判断有效探测地址（health.host 或 Sun-Panel 主机回退）。
 """
 from __future__ import annotations
 
@@ -26,6 +27,15 @@ def _cfg(k: str):
         c.close()
 
 
+def _health_configured() -> bool:
+    """P2-7：反映是否有可用探测地址（health.host 或 Sun-Panel 主机回退），与 /api/health/detail 一致。"""
+    try:
+        from service.health_service import HealthService
+        return bool(HealthService().probe_host())
+    except Exception:  # noqa: BLE001
+        return _cfg("health")
+
+
 def _merge_cfg(kind: str, body: dict) -> dict:
     from web.api.config import get_cfg
     out = dict(get_cfg(kind) or {})
@@ -42,7 +52,7 @@ def _merge_cfg(kind: str, body: dict) -> dict:
 def health():
     return {"ok": True, "version": "2.0.0", "service": "ugnas-bridge",
             "configured": {"ugreen": _cfg("ugreen"), "sunpanel": _cfg("sunpanel"),
-                           "health": _cfg("health")}}
+                           "health": _health_configured()}}
 
 
 @router.get("/health/detail")

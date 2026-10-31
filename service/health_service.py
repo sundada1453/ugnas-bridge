@@ -7,6 +7,7 @@
 - 未配置探测地址时明确返回「未探测」，不再伪造全绿；
 - 改用 TCP connect 判断端口可达（应用清单是按端口管理的，HTTP GET 对 SSH/VNC 类端口不适用）；
 - health 表主键改为 (app, port)，修复「run 37 项、detail 27 项」的口径不一致。
+2026-10-31 QA 复测（P2-7）：公开 probe_host()，供 /api/health 计算 configured.health。
 """
 from __future__ import annotations
 
@@ -36,6 +37,10 @@ class HealthService:
         except Exception:  # noqa: BLE001
             host = ""
         return host or os.environ.get("UGNAS_HEALTH_HOST", "").strip()
+
+    def probe_host(self) -> str:
+        """当前实际使用的探测地址（含 health.host 与 Sun-Panel 主机回退）。"""
+        return self._probe_host()
 
     def _apps(self) -> List[dict]:
         c = connect()
