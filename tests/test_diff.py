@@ -9,19 +9,20 @@ from sunpanel.diff import Card, DiscoveredApp, diff, summarize  # noqa: E402
 
 
 def test_four_states():
+    # 现有卡片：5244/8097 命中且一致；7050 命中但 title 变化；9208/9820 无发现 -> expired
     cards = [
         Card("ugnas-5244", 5244, title="openlist", icon="openlist", group_id="13"),
         Card("ugnas-8097", 8097, title="Emby", icon="emby", group_id="13"),
         Card("ugnas-7050", 7050, title="alist-old", icon="alist", group_id="13"),
         Card("ugnas-9208", 9208, title="mdc"),
         Card("ugnas-9820", 9820, title="cc-connect"),
-        Card("ugnas-6080", 6080, title="vnc"),
+        Card("ugnas-6080", 6080, title="vnc"),  # 手动/宿主
     ]
     apps = [
         DiscoveredApp("openlist", 5244, icon="openlist", group_id="13"),
         DiscoveredApp("Emby", 8097, icon="emby", group_id="13"),
         DiscoveredApp("alist", 7050, icon="alist", group_id="13"),
-        DiscoveredApp("sub2api", 8080, icon="", group_id="13"),
+        DiscoveredApp("sub2api", 8080, icon="", group_id="13"),  # 新
     ]
     rows = diff(apps, cards, manual_ports=[6080])
     s = summarize(rows)
@@ -35,6 +36,14 @@ def test_four_states():
     print("test_four_states PASS", s)
 
 
+def test_host_port_not_expired():
+    """P0 回归：host 网络容器端口不在 discovery 集时，经宿主 TCP 探测确认活端口 -> same。"""
+    cards = [Card("ugnas-8080", 8080, title="sub2api", group_id="13")]
+    rows = diff([], cards, manual_ports={8080})
+    assert len(rows) == 1 and rows[0].state == "same", rows
+    print("test_host_port_not_expired PASS")
+
+
 def test_empty():
     assert summarize(diff([], [])) == {"new": 0, "update": 0, "expired": 0, "same": 0}
     print("test_empty PASS")
@@ -42,4 +51,5 @@ def test_empty():
 
 if __name__ == "__main__":
     test_four_states()
+    test_host_port_not_expired()
     test_empty()

@@ -25,7 +25,7 @@ from service.health_service import HealthService  # noqa: E402
 from web import security                          # noqa: E402
 from web.api import auth, config, discover, open as openapi, sync, system  # noqa: E402
 
-app = FastAPI(title="ugnas-bridge", version="2.0.0")
+app = FastAPI(title="ugnas-bridge", version="2.0.1")
 init_db()
 LOG = setup_logging()
 _health = HealthService()

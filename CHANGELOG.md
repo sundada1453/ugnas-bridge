@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## v2.0.1（2026-10-31）
+### 修复
+- **四态误判 P0**：四态判定接入 `discover/host_probe.py` 宿主 TCP 探测（tailscale 容器 netns=host 跳板）+ `health` up 端口第三层兜底；宿主网络/容器扫描漏网端口不再被误判 `expired`。
+- **v1 遗产保护**：`state/cards_state.json` 中的 v1 `ugnas-<port>` 卡纳入 protected 池，不判过期、不删除；`ugnas-desktop` 与非 `ugnas-<port>` 用户卡不进入四态管理。
+- **同步 apply 验证**：真实面板创建/更新卡到指定 QA 分组并回读通过（`create/update ok1/fail0`）；修正 `apply` 响应与前端成功提示。
+- 版本号 `2.0.1`。
+- 详见 `docs/27-四态三层兜底修复.md`。
+
 ## v2.0.0（2026-10-31）
 ### 新增
 - Web 管理台（FastAPI + 原生单页，深色主题、移动端自适应）：登录/配置向导/仪表盘/应用清单/四态同步/设置

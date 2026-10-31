@@ -50,7 +50,7 @@ def _merge_cfg(kind: str, body: dict) -> dict:
 
 @router.get("/health")
 def health():
-    return {"ok": True, "version": "2.0.0", "service": "ugnas-bridge",
+    return {"ok": True, "version": "2.0.1", "service": "ugnas-bridge",
             "configured": {"ugreen": _cfg("ugreen"), "sunpanel": _cfg("sunpanel"),
                            "health": _health_configured()}}
 
